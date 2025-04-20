@@ -1,0 +1,66 @@
+name: Publish NuGet package
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.x'
+
+    - name: Extract version from .csproj
+      id: version
+      run: |
+        VERSION=$(grep -oPm1 "(?<=<Version>)[^<]+" ./src/Nora.Core.Api/Nora.Core.Api.csproj)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Check if tag exists
+      id: check_tag
+      run: |
+        if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+          echo "TAG_EXISTS=true" >> $GITHUB_ENV
+        else
+          echo "TAG_EXISTS=false" >> $GITHUB_ENV
+        fi
+
+    - name: Restore dependencies
+      run: |
+        dotnet nuget add source \
+          --username "wjnnora" \
+          --password "${{ secrets.GH_PACKAGES_PAT }}" \
+          --store-password-in-clear-text \
+          --name github "https://nuget.pkg.github.com/wjnnora/index.json"
+        dotnet restore ./src/Nora.Core.Api/Nora.Core.Api.csproj
+
+    - name: Build
+      run: dotnet build ./src/Nora.Core.Api/Nora.Core.Api.csproj --configuration Release --no-restore
+
+    - name: Create and push tag
+      if: ${{ env.TAG_EXISTS == 'false' && env.VERSION != '0.0.0' }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag $VERSION
+        if ! git push origin $VERSION; then
+          echo "Tag already exists or failed to push. Skipping this step."
+        fi
+
+    - name: Pack with tag-based version
+      if: ${{ env.TAG_EXISTS == 'false' }}
+      run: dotnet pack ./src/Nora.Core.Api/Nora.Core.Api.csproj --configuration Release --no-build /p:PackageVersion=${{ env.VERSION }}
+
+    - name: Publish to GitHub Packages
+      if: ${{ env.TAG_EXISTS == 'false' }}
+      run: dotnet nuget push ./src/Nora.Core.Api/bin/Release/*.nupkg --source "https://nuget.pkg.github.com/wjnnora/index.json" --api-key ${{ secrets.GH_PACKAGES_PAT }} --skip-duplicate
