@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 
-namespace Nora.Core.Api.FluentValidation;
+namespace Nora.Core.Api.FluentValidation.Extensions;
 
 public static class FluentValidationExtensions
 {

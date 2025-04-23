@@ -1,8 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Nora.Core.Api.Refit.Extensions;
 using Refit;
 using System.Text.Json;
 
-namespace Nora.Core.Api.Refit;
+namespace Nora.Core.Api.Refit.Extensions;
 
 public static class RefitExtensions
 {
